@@ -510,12 +510,19 @@ func (c *Collector) Appengine(ctx context.Context) {
 // request to the URL specified in parameter.
 // Visit also calls the previously provided callbacks
 func (c *Collector) Visit(URL string) error {
+	VisitWithContext(nil, URL)
+}
+
+// Visit starts Collector's collecting job by creating a
+// request to the URL specified in parameter.
+// Visit also calls the previously provided callbacks
+func (c *Collector) VisitWithContext(ctx context.Context, URL string) error {
 	if c.CheckHead {
-		if check := c.scrape(URL, "HEAD", 1, nil, nil, nil, true); check != nil {
+		if check := c.scrape(URL, "HEAD", 1, nil, ctx, nil, true); check != nil {
 			return check
 		}
 	}
-	return c.scrape(URL, "GET", 1, nil, nil, nil, true)
+	return c.scrape(URL, "GET", 1, nil, ctx, nil, true)
 }
 
 // HasVisited checks if the provided URL has been visited
@@ -567,7 +574,7 @@ func (c *Collector) PostMultipart(URL string, requestData map[string][]byte) err
 //   - "DELETE"
 //   - "PATCH"
 //   - "OPTIONS"
-func (c *Collector) Request(method, URL string, requestData io.Reader, ctx *Context, hdr http.Header) error {
+func (c *Collector) Request(method, URL string, requestData io.Reader, ctx *context.Context, hdr http.Header) error {
 	return c.scrape(URL, method, 1, requestData, ctx, hdr, true)
 }
 
@@ -579,6 +586,12 @@ func (c *Collector) SetDebugger(d debug.Debugger) {
 
 // UnmarshalRequest creates a Request from serialized data
 func (c *Collector) UnmarshalRequest(r []byte) (*Request, error) {
+	ctx := NewContext()
+	req, err := UnmarshalRequestWithContext(ctx, r)
+	return req, err
+}
+
+func (c *Collector) UnmarshalRequestWithContext(ctx *context.Context, r []byte) (*Request, error) {
 	req := &serializableRequest{}
 	err := json.Unmarshal(r, req)
 	if err != nil {
@@ -590,7 +603,6 @@ func (c *Collector) UnmarshalRequest(r []byte) (*Request, error) {
 		return nil, err
 	}
 
-	ctx := NewContext()
 	for k, v := range req.Ctx {
 		ctx.Put(k, v)
 	}
@@ -607,7 +619,7 @@ func (c *Collector) UnmarshalRequest(r []byte) (*Request, error) {
 	}, nil
 }
 
-func (c *Collector) scrape(u, method string, depth int, requestData io.Reader, ctx *Context, hdr http.Header, checkRevisit bool) error {
+func (c *Collector) scrape(u, method string, depth int, requestData io.Reader, ctx *context.Context, hdr http.Header, checkRevisit bool) error {
 	parsedWhatwgURL, err := urlParser.Parse(u)
 	if err != nil {
 		return err
@@ -654,7 +666,7 @@ func (c *Collector) scrape(u, method string, depth int, requestData io.Reader, c
 	return c.fetch(u, method, depth, requestData, ctx, hdr, req)
 }
 
-func (c *Collector) fetch(u, method string, depth int, requestData io.Reader, ctx *Context, hdr http.Header, req *http.Request) error {
+func (c *Collector) fetch(u, method string, depth int, requestData io.Reader, ctx *context.Context, hdr http.Header, req *http.Request) error {
 	defer c.wg.Done()
 	if ctx == nil {
 		ctx = NewContext()
@@ -1205,7 +1217,7 @@ func (c *Collector) handleOnXML(resp *Response) error {
 	return nil
 }
 
-func (c *Collector) handleOnError(response *Response, err error, request *Request, ctx *Context) error {
+func (c *Collector) handleOnError(response *Response, err error, request *Request, ctx *context.Context) error {
 	if err == nil && (c.ParseHTTPErrorResponse || response.StatusCode < 203) {
 		return nil
 	}
