@@ -1,4 +1,4 @@
-module github.com/gocolly/colly
+module github.com/majdus/colly
 
 require (
 	github.com/PuerkitoBio/goquery v1.4.1
